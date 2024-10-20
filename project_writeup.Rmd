@@ -1,0 +1,73 @@
+# Practical Machine Learning: Course Project
+
+```{r echo = FALSE}
+library(knitr)
+set.seed(100)
+```
+
+## Aim
+
+As a part of the project, 6 participants were asked to perform barbell correctly and incorrectly in 5 different ways with accelerometers on their belt, arm, forearm and the dumbell. The goal is to predict, based on the data obtained from the accelerometers, in which way they exercised.
+
+## Model Training
+
+### Reading the data
+
+The data from the accelerometers is given in the from of a ```.csv()``` file with the unavailable values set as ```NA```.  The ```.csv()``` file is read into R using the ```read.csv()``` function.
+
+```{r}
+rawData <- read.csv("pml-training.csv", na.string = c("NA",""))
+
+```
+
+Next, columns with a large proportion of ```NA``` or missing values are removed as they are not useful for training the model.
+
+```{r}
+propNAs <- colMeans(is.na(rawData))
+table(propNAs)
+```
+
+As observed in the table describing the proportion of ```NA``` in columns, 100 columns have about 97.93% of their values as ```NA```. As mentioned above, these are removed as they do not aid in training the model.
+
+```{r}
+idx <- !propNAs
+rawDataReduced <- rawData[idx]
+```
+
+Other unnecessary columns that need to be removed are ```x``` (contains row numbers), ```user_name``` (contains usernames, which will not be of any use in a model), ```raw_timestamp_part_1```, ```raw_timestamp_part_2``` and ```cvtd_timestamp``` (contain timestamps, which will again not be of any use in a model)
+
+```{r}
+idx <- grep("^X$|user_name|timestamp|window", names(rawDataReduced))
+rawDataReduced2 <- rawDataReduced[-idx]
+```
+
+### Preparing the data for training
+
+Now, the dataset contains one outcome column ```classe``` and 59 feature columns. The ```createDataPartition()``` method from the ```caret``` package is used to split the data into training and test. Here, 70% of the data goes to the training set.
+
+```{r}
+library(caret)
+inTrain <- createDataPartition(y = rawDataReduced2$classe, p = 0.7, list = FALSE)
+training <- rawDataReduced2[inTrain, ]
+crossval <- rawDataReduced2[-inTrain, ]
+```
+
+_Random forest_ was used to build a prediction model. The prediction model is used on the test set.
+
+```{r}
+library(randomForest)
+trControl <- trainControl(method = "cv", number = 2)
+modFit <- train(classe ~ ., data = training, method = "rf", prox = TRUE, trControl = trControl)
+pred <- predict(modFit, newdata = crossval)
+```
+
+The model gives an overall accuracy of 99.24% and an out-of-sample error of 0.76%.
+
+### Variable Importance
+
+The ```varImp()``` function from the ```caret``` package is used to determine the relative variable importance.
+
+```{r}
+vi <- varImp(modFit)$importance
+vi[head(order(unlist(vi), decreasing = TRUE), 5L), , drop = FALSE]
+```
